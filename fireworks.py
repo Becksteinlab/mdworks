@@ -1,30 +1,84 @@
+import os
 
 from fireworks import ScriptTask
-from fireworks.core.firework import Firework, Workflow
-from fireworks.core.launchpad import LaunchPad
-from fireworks.core.rocket_launcher import rapidfire
+from fireworks.core.firework import Firework
 
 from fireworks.features.background_task import BackgroundTask
 
-def submit_md(launchdir, launchpad='default', deffnm='md'):
-    """Submit an MD workflow.
+from .firetasks import GMXmdrunTask, FileRsyncTask
+
+def make_md_firework(name, launchdir, scratchdir, deffnm='md', tpr='md.tpr',
+                     cpt='md.cpt', srcuser=None, srchost=None):
+    """Construct an MD Firework. This firework can then be incorporated into a
+    workflow and submitted to a launchpad.
+
+    Parameters
+    ----------
+    name : str
+        Name to give this Firework.
+    launchdir : str
+        Absolute path to directory to launch from, which holds all required and
+        generated data.
+    scratchdir : str
+        Absolute path to directory on remote resource to run MD within.
+    deffnm : str
+        Prefix for all Gromacs output files.
+    tpr : str
+        File name (not path) of run-input file.
+    cpt : str
+        File name (not path) of checkpoint file; need not exist.
+
+    Returns
+    -------
+    firework 
+        MD firework; can be submitted as part of a workflow to LaunchPad of
+        choice.
 
     """
-    if launchpad == 'default':
-        lpad = fireworks.LaunchPad.auto_load()
-    elif isinstance(launchpad, :
-        lpad 
-    
-    ft1 = fireworks.ScriptTask(script='/nfs/homes4/dldotson/.fireworks/run_md.sh')
+    tpr = os.path.join(launchdir, tpr)
+    cpt = os.path.join(launchdir, cpt)
+
+    if os.path.exists(cpt):
+        files = [tpr, cpt]
+    else:
+        files = [tpr]
+
+    # first, rsync needed files
+    if srcuser and srchost:
+        ft_copy = FileRsyncTask(mode='remotesrc',
+                                files=files,
+                                dest=scratchdir,
+                                srcuser=srcuser,
+                                srchost=srchost)
+    else:
+        ft_copy = FileRsyncTask(mode='local',
+                                files=files,
+                                dest=scratchdir)
+
+    # next, run MD
+    ft_md = GMXmdrunTask(
+
+
+    # finally, copy back what's left
+    if srcuser and srchost:
+        ft_copyback = FileRsyncTask(mode='remotedest',
+                                    files='{}/*'.format(scratchdir),
+                                    dest=launchdir,
+                                    destuser=srcuser,
+                                    desthost=srchost)
+    else:
+        ft_copyback = FileRsyncTask(mode='remotedest',
+                                    files='{}/*'.format(scratchdir),
+                                    dest=launchdir)
     
     # periodically pull the latest files in the background
-    bg1 = BackgroundTask(fireworks.ScriptTask(script=sim['WORK/pull.sh'].abspath),
-                                              sleep_time=3600)
+    bg1 = BackgroundTask(ft_copyback, sleep_time=3600, run_on_finish=True)
     
-    fw_md = fireworks.Firework(ft1, spec={'_launch_dir': sim['WORK/'].abspath,
-                                          '_category': 'workstationq',
-                                          '_background_tasks': [bg1],
-                                          '_queueadapter': {'launch_dir': sim['WORK/'].abspath}},
-                               name="{}_MD".format(sim.name))
-    
-    lpad.add_wf(fw_md)
+    fw_md = fireworks.Firework([ft_copy, ft_md], 
+                               spec={'_launch_dir': scratchdir,
+                                     '_category': 'md',
+                                     '_background_tasks': [bg1],
+                                     '_queueadapter': {'launch_dir': scratchdir}},
+                               name=name)
+
+    return fw_md
