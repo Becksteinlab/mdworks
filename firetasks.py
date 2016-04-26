@@ -1,4 +1,6 @@
+from __future__ import unicode_literals
 
+import subprocess
 from fireworks import FireTaskBase
 
 
@@ -8,7 +10,7 @@ class GMXmdrunTask(FireTaskBase):
     optional_params = ["modules"]
 
     def run_task(self, fw_spec):
-
+        pass
 
 
 class FileRsyncTask(FireTaskBase):

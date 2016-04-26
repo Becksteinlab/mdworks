@@ -7,6 +7,7 @@ from fireworks.features.background_task import BackgroundTask
 
 from .firetasks import GMXmdrunTask, FileRsyncTask
 
+
 def make_md_firework(name, launchdir, scratchdir, deffnm='md', tpr='md.tpr',
                      cpt='md.cpt', srcuser=None, srchost=None):
     """Construct an MD Firework. This firework can then be incorporated into a
@@ -56,9 +57,8 @@ def make_md_firework(name, launchdir, scratchdir, deffnm='md', tpr='md.tpr',
                                 dest=scratchdir)
 
     # next, run MD
-    ft_md = GMXmdrunTask(
-
-
+    ft_md = ScriptTask(script='run_md.sh', stdin_key=scratchdir, fizzle_bad_rc=True)
+ 
     # finally, copy back what's left
     if srcuser and srchost:
         ft_copyback = FileRsyncTask(mode='remotedest',
@@ -74,11 +74,11 @@ def make_md_firework(name, launchdir, scratchdir, deffnm='md', tpr='md.tpr',
     # periodically pull the latest files in the background
     bg1 = BackgroundTask(ft_copyback, sleep_time=3600, run_on_finish=True)
     
-    fw_md = fireworks.Firework([ft_copy, ft_md], 
-                               spec={'_launch_dir': scratchdir,
-                                     '_category': 'md',
-                                     '_background_tasks': [bg1],
-                                     '_queueadapter': {'launch_dir': scratchdir}},
-                               name=name)
+    fw_md = Firework([ft_copy, ft_md], 
+                     spec={'_launch_dir': scratchdir,
+                           '_category': 'md',
+                           '_background_tasks': [bg1],
+                           '_queueadapter': {'launch_dir': scratchdir}},
+                     name=name)
 
     return fw_md
