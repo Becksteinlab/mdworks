@@ -58,7 +58,7 @@ class FileRsyncTask(FireTaskBase):
                                                     host=self['desthost'],
                                                     dest=dest)
 
-            returncodes.append(subprocess.call(["bash", "rsync", src, dest]))
+            returncodes.append(subprocess.call(["rsync", '-a', '--partial', src, dest], shell=True))
 
         if sum(returncodes) != 0:
             raise RuntimeError('FileRsyncTask fizzled! Return code: {}'.format(returncodes))

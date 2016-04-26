@@ -1,6 +1,6 @@
 import os
 
-from fireworks import ScriptTask
+from fireworks import ScriptTask, PyTask
 from fireworks.core.firework import Firework
 
 from fireworks.features.background_task import BackgroundTask
@@ -44,7 +44,10 @@ def make_md_firework(name, launchdir, scratchdir, deffnm='md', tpr='md.tpr',
     else:
         files = [tpr]
 
-    # first, rsync needed files
+    # make scratch dir
+    ft_makedir = PyTask(func='os.makedirs', args=[scratchdir])
+
+    # rsync needed files
     if srcuser and srchost:
         ft_copy = FileRsyncTask(mode='remotesrc',
                                 files=files,
@@ -67,15 +70,15 @@ def make_md_firework(name, launchdir, scratchdir, deffnm='md', tpr='md.tpr',
                                     destuser=srcuser,
                                     desthost=srchost)
     else:
-        ft_copyback = FileRsyncTask(mode='remotedest',
+        ft_copyback = FileRsyncTask(mode='local',
                                     files='{}/*'.format(scratchdir),
                                     dest=launchdir)
     
     # periodically pull the latest files in the background
     bg1 = BackgroundTask(ft_copyback, sleep_time=3600, run_on_finish=True)
     
-    fw_md = Firework([ft_copy, ft_md], 
-                     spec={'_launch_dir': scratchdir,
+    fw_md = Firework([ft_makedir, ft_copy, ft_md], 
+                     spec={'_launch_dir': launchdir,
                            '_category': 'md',
                            '_background_tasks': [bg1],
                            '_queueadapter': {'launch_dir': scratchdir}},
