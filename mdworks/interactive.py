@@ -1,11 +1,10 @@
 import os
 
 from fireworks import ScriptTask, PyTask, FileTransferTask
+from fireworks import Workflow
 from fireworks.core.firework import Firework
 
-from fireworks.features.background_task import BackgroundTask
-
-from mdworks.firetasks import FilePull
+from mdworks.firetasks import FilePullTask, BeaconTask
 
 def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cpt'):
     """Construct an MD workflow.
@@ -32,7 +31,7 @@ def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cp
         MD workflow; can be submitted to LaunchPad of choice.
 
     """
-    if os.path.exists(cpt):
+    if os.path.exists(os.path.join(archive, cpt)):
         files = [tpr, cpt]
     else:
         files = [tpr]
@@ -57,37 +56,33 @@ def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cp
 
     # copy input files to scratch space
     ft_copy = FileTransferTask(mode='copy',
-                               files=[os.path.join('$STAGING/', sim.uuid, i) for i in files],
-                               dest='$WORK/',
+                               files=[os.path.join('${STAGING}/', sim.uuid, i) for i in files],
+                               dest='${SCRATCHDIR}/',
                                shell_interpret=True)
 
     # next, run MD
-    ft_md = ScriptTask(script='run_md.sh', stdin_key, fizzle_bad_rc=True)
+    ft_md = ScriptTask(script='run_md.sh', fizzle_bad_rc=True)
 
     # send info on where files live to pull firework
     ft_info = BeaconTask()
 
-    fw_md = Firework([ft_copy, ft_md],
-                     spec={'_category': 'md',
-                           '_pass_job_info': True},
+    fw_md = Firework([ft_copy, ft_md, ft_info],
+                     spec={'_category': 'md'},
                      name='md',
                      parents=fw_stage)
 
  
     ## Pull files back to archive; takes place locally
-    ft_copyback = FilePull(files=[],                        # updated by previous FW
-                           dest=archive,
-                           server=None,                     # updated by previous FW
+    ft_copyback = FilePullTask(dest=archive)
+
+    fw_copyback = Firework([ft_copyback],
                            spec={'_launch_dir': archive,
                                  '_category': 'local'},
                            name='pull',
                            parents=fw_md)
 
 
-    ft_copyback = FileRsyncTask(mode='remotedest',
-                                    files='{}/*'.format(scratchdir),
-                                    dest=launchdir,
-                                    destuser=srcuser,
-                                    desthost=srchost)
-    
+    wf = Workflow([fw_stage, fw_md, fw_copyback],
+                  name='{} | md'.format(sim.name),
+                  metadata=dict(sim.categories))
     return wf

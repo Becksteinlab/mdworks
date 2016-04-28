@@ -1,7 +1,10 @@
 from __future__ import unicode_literals
 
+import os
+
+from os.path import expanduser
 import subprocess
-from fireworks import FireTaskBase
+from fireworks import FireTaskBase, FWAction
 
 
 class GMXmdrunTask(FireTaskBase):
@@ -13,7 +16,21 @@ class GMXmdrunTask(FireTaskBase):
         pass
 
 
-class FilePull(FireTaskBase):
+class BeaconTask(FireTaskBase):
+    """
+    A FireTask to tell the next Firework where the generated files are
+    so they can be pulled back down.
+
+    """
+    _fw_name = 'BeaconTask'
+
+    def run_task(self, fw_spec):
+        return FWAction(update_spec={'files': [os.environ['SCRATCHDIR']],
+                                     'server': os.environ['HOST'],
+                                     'user': os.environ['USER']})
+
+
+class FilePullTask(FireTaskBase):
     """
     A FireTask to Transfer files from a remote server. Note that
     Required params:
@@ -24,8 +41,8 @@ class FilePull(FireTaskBase):
         - user: (str) user to authenticate with on remote server
         - key_filename: (str) optional SSH key location for remote transfer
     """
-    _fw_name = 'PullTask'
-    required_params = ["files"]
+    _fw_name = 'FilePullTask'
+    required_params = ["dest"]
 
     def run_task(self, fw_spec):
         shell_interpret = self.get('shell_interpret', True)
@@ -36,10 +53,10 @@ class FilePull(FireTaskBase):
         import paramiko
         ssh = paramiko.SSHClient()
         ssh.load_host_keys(expanduser(os.path.join("~", ".ssh", "known_hosts")))
-        ssh.connect(self['server'], username=self.get('user'), key_filename=self.get['key_filename'])
+        ssh.connect(fw_spec['server'], username=self.get('user'), key_filename=self.get('key_filename'))
         sftp = ssh.open_sftp()
 
-        for src in self["files"]:
+        for src in fw_spec["files"]:
             try:
                 dest = self['dest']
 
