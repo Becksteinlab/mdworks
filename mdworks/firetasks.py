@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import os
+import warnings
 
 from os.path import expanduser
 import subprocess
@@ -81,6 +82,71 @@ class FilePullTask(FireTaskBase):
 
         sftp.close()
         ssh.close()
+
+
+class ContinueTask(FireTaskBase):
+    """
+    A FireTask to check the step listed in the CPT file against the total
+    number of steps desired in the TPR file. If there are steps left to
+    go, another MD workflow is submitted.
+
+    Parameters
+    ----------
+    sim : str
+        MDSynthesis Sim.
+    archive : str
+        Absolute path to directory to launch from, which holds all required data.
+    stages: list
+        Dicts giving for each of the following keys:
+            - 'server': server host to transfer to
+            - 'user': username to authenticate with
+            - 'staging': absolute path to staging area on remote resource
+    modulesrc : str
+        Absolute path to Module system's `python.py` interface.
+    gmxmodule : str
+        Name of gromacs module to load; used for TPR and CPT parsing.
+    tpr : str
+        File name (not path) of run-input file.
+    cpt : str
+        File name (not path) of checkpoint file; need not exist.
+
+    """
+    _fw_name = 'ContinueTask'
+    required_params = ["sim", "archive", "stages", "modulesrc", "gmxmodule", "tpr", "cpt"]
+
+    def run_task(self, fw_spec):
+        from .interactive import make_md_workflow
+
+        try:
+            execfile(self['modulesrc'])
+            module('load', self['gmxmodule'])
+        except:
+            warnings.warn("Could not load specified module")
+
+        import gromacs
+
+        cpt = os.path.join(self['archive'], self['cpt'])
+        tpr = os.path.join(self['archive'], self['tpr'])
+
+        # extract step number from CPT file
+        out = gromacs.dump(cp=cpt, stdout=False)
+        step = int([line.split(' ')[-1] for line in out[1].split('\n') if 'step = ' in line][0])
+
+        # extract nsteps from TPR file
+        out = gromacs.dump(s=tpr, stdout=False)
+        nsteps = int([line.split(' ')[-1] for line in out[1].split('\n') if 'nsteps' in line][0])
+
+        # if step < nsteps, we submit a new workflow
+        if step < nsteps:
+            wf = make_md_workflow(sim=self['sim'],
+                                  archive=self['archive'],
+                                  stages=self['stages'],
+                                  modulesrc=self['modulesrc'],
+                                  gmxmodule=self['gmxmodule'],
+                                  tpr=self['tpr'],
+                                  cpt=self['cpt'])
+
+            return FWAction(additions=wf)
 
 
 class FileRsyncTask(FireTaskBase):

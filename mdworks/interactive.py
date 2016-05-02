@@ -1,12 +1,14 @@
 import os
 
+import mdsynthesis as mds
+
 from fireworks import ScriptTask, PyTask, FileTransferTask
 from fireworks import Workflow
 from fireworks.core.firework import Firework
 
-from mdworks.firetasks import FilePullTask, BeaconTask
+from mdworks.firetasks import FilePullTask, BeaconTask, ContinueTask
 
-def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cpt'):
+def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffnm='md', tpr='md.tpr', cpt='md.cpt'):
     """Construct an MD workflow.
 
     Parameters
@@ -15,11 +17,15 @@ def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cp
         MDSynthesis Sim.
     archive : str
         Absolute path to directory to launch from, which holds all required data.
-    stages: list
+    stages : list
         Dicts giving for each of the following keys:
             - 'server': server host to transfer to
             - 'user': username to authenticate with
             - 'staging': absolute path to staging area on remote resource
+    modulesrc : str
+        Absolute path to Module system's `python.py` interface.
+    gmxmodule : str
+        Name of gromacs module to load; used for TPR and CPT parsing.
     tpr : str
         File name (not path) of run-input file.
     cpt : str
@@ -31,6 +37,8 @@ def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cp
         MD workflow; can be submitted to LaunchPad of choice.
 
     """
+    sim = mds.Sim(sim)
+
     if os.path.exists(os.path.join(archive, cpt)):
         files = [tpr, cpt]
     else:
@@ -81,8 +89,23 @@ def make_md_workflow(sim, archive, stages, deffnm='md', tpr='md.tpr', cpt='md.cp
                            name='pull',
                            parents=fw_md)
 
+    ## Decide if we need to continue and submit new workflow if so; takes place
+    ## locally
+    ft_continue = ContinueTask(sim=sim,
+                               archive=archive,
+                               stages=stages,
+                               modulesrc=modulesrc,
+                               gmxmodule=gmxmodule,
+                               tpr=tpr,
+                               cpt=cpt)
 
-    wf = Workflow([fw_stage, fw_md, fw_copyback],
+    fw_continue = Firework([ft_continue],
+                           spec={'_launch_dir': archive,
+                                 '_category': 'local'},
+                           name='continue',
+                           parents=fw_copyback)
+
+    wf = Workflow([fw_stage, fw_md, fw_copyback, fw_continue],
                   name='{} | md'.format(sim.name),
                   metadata=dict(sim.categories))
     return wf
