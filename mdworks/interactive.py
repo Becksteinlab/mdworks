@@ -8,7 +8,9 @@ from fireworks.core.firework import Firework
 
 from mdworks.firetasks import FilePullTask, BeaconTask, ContinueTask
 
-def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffnm='md', tpr='md.tpr', cpt='md.cpt'):
+def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None,
+                     md_category='md', postprocessing_wf=None, deffnm='md',
+                     tpr='md.tpr', cpt='md.cpt'):
     """Construct an MD workflow.
 
     Parameters
@@ -22,10 +24,8 @@ def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffn
             - 'server': server host to transfer to
             - 'user': username to authenticate with
             - 'staging': absolute path to staging area on remote resource
-    modulesrc : str
-        Absolute path to Module system's `python.py` interface.
-    gmxmodule : str
-        Name of gromacs module to load; used for TPR and CPT parsing.
+    postprocessing_wf : Workflow
+        Workflow to perform after copyback; performed in parallel to continuation run.
     tpr : str
         File name (not path) of run-input file.
     cpt : str
@@ -52,6 +52,7 @@ def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffn
                                           user=stage['user'],
                                           files=[os.path.join(archive, i) for i in files],
                                           dest=os.path.join(stage['staging'], sim.uuid),
+                                          retry=True,
                                           shell_interpret=True))
 
     fw_stage = Firework(fts_stage,
@@ -75,7 +76,7 @@ def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffn
     ft_info = BeaconTask()
 
     fw_md = Firework([ft_copy, ft_md, ft_info],
-                     spec={'_category': 'md'},
+                     spec={'_category': md_category},
                      name='md',
                      parents=fw_stage)
 
@@ -89,13 +90,14 @@ def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffn
                            name='pull',
                            parents=fw_md)
 
+
     ## Decide if we need to continue and submit new workflow if so; takes place
     ## locally
     ft_continue = ContinueTask(sim=sim,
                                archive=archive,
                                stages=stages,
-                               modulesrc=modulesrc,
-                               gmxmodule=gmxmodule,
+                               md_category=md_category,
+                               postprocessing_wf=postprocessing_wf,
                                tpr=tpr,
                                cpt=cpt)
 
@@ -108,4 +110,12 @@ def make_md_workflow(sim, archive, stages, modulesrc=None, gmxmodule=None, deffn
     wf = Workflow([fw_stage, fw_md, fw_copyback, fw_continue],
                   name='{} | md'.format(sim.name),
                   metadata=dict(sim.categories))
+
+    ## Mix in postprocessing workflow, if given
+    if postprocessing_wf:
+        if isinstance(postprocessing_wf, dict):
+            postprocessing_wf = Workflow.from_dict(postprocessing_wf)
+
+        wf.append_wf(postprocessing_wf, [fw_copyback.fw_id])
+        
     return wf

@@ -101,10 +101,8 @@ class ContinueTask(FireTaskBase):
             - 'server': server host to transfer to
             - 'user': username to authenticate with
             - 'staging': absolute path to staging area on remote resource
-    modulesrc : str
-        Absolute path to Module system's `python.py` interface.
-    gmxmodule : str
-        Name of gromacs module to load; used for TPR and CPT parsing.
+    postprocessing_wf : Workflow
+        Workflow to perform after copyback; performed in parallel to continuation run.
     tpr : str
         File name (not path) of run-input file.
     cpt : str
@@ -112,16 +110,16 @@ class ContinueTask(FireTaskBase):
 
     """
     _fw_name = 'ContinueTask'
-    required_params = ["sim", "archive", "stages", "modulesrc", "gmxmodule", "tpr", "cpt"]
+    required_params = ["sim",
+                       "archive",
+                       "stages",
+                       "md_category",
+                       "postprocessing_wf",
+                       "tpr",
+                       "cpt"]
 
     def run_task(self, fw_spec):
         from .interactive import make_md_workflow
-
-        try:
-            execfile(self['modulesrc'])
-            module('load', self['gmxmodule'])
-        except:
-            warnings.warn("Could not load specified module")
 
         import gromacs
 
@@ -141,8 +139,8 @@ class ContinueTask(FireTaskBase):
             wf = make_md_workflow(sim=self['sim'],
                                   archive=self['archive'],
                                   stages=self['stages'],
-                                  modulesrc=self['modulesrc'],
-                                  gmxmodule=self['gmxmodule'],
+                                  md_category=self['md_category'],
+                                  postprocessing_wf=self['postprocessing_wf'],
                                   tpr=self['tpr'],
                                   cpt=self['cpt'])
 
