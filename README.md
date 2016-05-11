@@ -1,4 +1,4 @@
-# **mdworks**: molecular dynamics, with Fireworks!
+## mdworks: molecular dynamics, with Fireworks!
 
 ``mdworks`` is a package for building fire-and-forget automated workflows for
 performing molecular dynamics simulation using
