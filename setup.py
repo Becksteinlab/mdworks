@@ -7,14 +7,14 @@ For a basic installation just type the command::
 
 """
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='mdworks',
       version='0.1.0-dev',
       description='molecular dynamics with fireworks',
       author='David Dotson',
       author_email='dotsdl@gmail.com',
-      packages=['mdworks'],
+      packages=find_packages('mdworks'),
       license='BSD',
-      install_requires=['fireworks']
+      install_requires=['fireworks', 'mdsynthesis']
       )
