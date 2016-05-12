@@ -14,7 +14,7 @@ setup(name='mdworks',
       description='molecular dynamics with fireworks',
       author='David Dotson',
       author_email='dotsdl@gmail.com',
-      packages=find_packages('mdworks'),
+      packages=['mdworks', 'mdworks.gromacs'],
       license='BSD',
       install_requires=['fireworks', 'mdsynthesis', 'GromacsWrapper']
       )

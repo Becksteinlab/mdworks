@@ -58,7 +58,7 @@ class GromacsContinueTask(FireTaskBase):
                    if (('cpt' in f) and ('prev' not in f))]
 
         if len(cpt) > 1:
-            raise ValueError("Multiple CPT files in 'files'; include ")
+            raise ValueError("Multiple CPT files in 'files'; include "
                              "only one.")
         elif len(tpr) < 1:
             raise ValueError("No CPT file in 'files'; "
@@ -67,10 +67,10 @@ class GromacsContinueTask(FireTaskBase):
             cpt = os.path.join(self['archive'], cpt[0])
 
         # bit of an ad-hoc way to grab the tpr file
-        tpr = [f for f in self['files'] if (('tpr' in f)]
+        tpr = [f for f in self['files'] if ('tpr' in f)]
 
         if len(tpr) > 1:
-            raise ValueError("Multiple TPR files in 'files'; include ")
+            raise ValueError("Multiple TPR files in 'files'; include "
                              "only one.")
         elif len(tpr) < 1:
             raise ValueError("No TPR file in 'files'; "

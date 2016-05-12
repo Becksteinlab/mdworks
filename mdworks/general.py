@@ -5,12 +5,12 @@ import mdsynthesis as mds
 from fireworks import ScriptTask, PyTask, FileTransferTask
 from fireworks import Workflow, Firework
 
-from mdworks.firetasks import FilePullTask, BeaconTask
-from mdworks.gromacs.firetasks import GromacsContinueTask
+from .firetasks import FilePullTask, BeaconTask
+from .gromacs.firetasks import GromacsContinueTask
 
 
 def make_md_workflow(sim, archive, stages, md_engine='gromacs',
-                     md_category='md', local_category='local'
+                     md_category='md', local_category='local',
                      postprocessing_wf=None, files=None):
     """Construct a general, single MD simulation workflow.
 
