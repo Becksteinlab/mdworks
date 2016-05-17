@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import os
 
+import mdsynthesis as mds
 from fireworks import FireTaskBase, FWAction
 import gromacs
 
@@ -40,7 +41,7 @@ class GromacsContinueTask(FireTaskBase):
         not exist, but if they do they will get staged before each run.
 
     """
-    _fw_name = 'ContinueTask'
+    _fw_name = 'GromacsContinueTask'
     required_params = ["sim",
                        "archive",
                        "stages",
@@ -51,7 +52,7 @@ class GromacsContinueTask(FireTaskBase):
                        "files"]
 
     def run_task(self, fw_spec):
-        from ..interactive import make_md_workflow
+        from ..general import make_md_workflow
 
         # bit of an ad-hoc way to grab the checkpoint file
         cpt = [f for f in self['files']
@@ -60,7 +61,7 @@ class GromacsContinueTask(FireTaskBase):
         if len(cpt) > 1:
             raise ValueError("Multiple CPT files in 'files'; include "
                              "only one.")
-        elif len(tpr) < 1:
+        elif len(cpt) < 1:
             raise ValueError("No CPT file in 'files'; "
                              "cannot do continue check.")
         else:
@@ -98,3 +99,6 @@ class GromacsContinueTask(FireTaskBase):
                                   files=self['files'])
 
             return FWAction(additions=[wf])
+        else:
+            sim = mds.Sim(fw_spec['sim'])
+            sim.categories['md_status'] = 'finished'
