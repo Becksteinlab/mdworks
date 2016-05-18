@@ -61,6 +61,11 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     """
     sim = mds.Sim(sim)
 
+    #TODO: perhaps move to its own FireTask?
+    sim.categories['md_status'] = 'running'
+
+    #TODO: the trouble with this is that if this workflow is created with the intent
+    #      of being attached to another, these files may not exist at all yet
     f_exist = [f for f in files if os.path.exists(os.path.join(archive, f))]
 
     ## Stage files on all resources where MD may run; takes place locally

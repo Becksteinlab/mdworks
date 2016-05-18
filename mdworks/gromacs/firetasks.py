@@ -2,8 +2,8 @@ from __future__ import unicode_literals
 
 import os
 
+import mdsynthesis as mds
 from fireworks import FireTaskBase, FWAction
-import gromacs
 
 
 class GromacsContinueTask(FireTaskBase):
@@ -55,7 +55,8 @@ class GromacsContinueTask(FireTaskBase):
                        "files"]
 
     def run_task(self, fw_spec):
-        from ..interactive import make_md_workflow
+        import gromacs
+        from ..general import make_md_workflow
 
         # bit of an ad-hoc way to grab the checkpoint file
         cpt = [f for f in self['files']
@@ -64,7 +65,7 @@ class GromacsContinueTask(FireTaskBase):
         if len(cpt) > 1:
             raise ValueError("Multiple CPT files in 'files'; include "
                              "only one.")
-        elif len(tpr) < 1:
+        elif len(cpt) < 1:
             raise ValueError("No CPT file in 'files'; "
                              "cannot do continue check.")
         else:
@@ -102,15 +103,16 @@ class GromacsContinueTask(FireTaskBase):
                                   files=self['files'])
 
             return FWAction(additions=[wf])
+        else:
+            sim = mds.Sim(fw_spec['sim'])
+            sim.categories['md_status'] = 'finished'
 
-        elif self.get('post_wf'):
-            # otherwise, we submit the post workflow
-            if isinstance(post_wf, dict):
-                post_wf = Workflow.from_dict(post_wf)
+            # if given, we submit the post workflow
+            if self.get('post_wf'):
+                if isinstance(post_wf, dict):
+                    post_wf = Workflow.from_dict(post_wf)
 
-            # this makes a fresh copy without already-used fw_ids
-            post_wf = Workflow.from_wflow(post_wf)
+                # this makes a fresh copy without already-used fw_ids
+                post_wf = Workflow.from_wflow(post_wf)
 
-            return FWAction(additions=[post_wf])
-
-
+                return FWAction(additions=[post_wf])
