@@ -33,21 +33,25 @@ class GromacsContinueTask(FireTaskBase):
     local_category : str
         Category to use for non-MD Fireworks, which should be run by rockets
         where the ``archive`` directory is accessible.
-    postprocessing_wf : Workflow
-        Workflow to perform after copyback; performed in parallel to continuation run.
+    postrun_wf : Workflow
+        Workflow to perform after each copyback; performed in parallel to continuation run.
+    post_wf : Workflow
+        Workflow to perform after completed MD (no continuation); use for final
+        postprocessing. 
     files : list 
         Names of files (not paths) needed for each leg of the simulation. Need
         not exist, but if they do they will get staged before each run.
 
     """
-    _fw_name = 'ContinueTask'
+    _fw_name = 'GromacsContinueTask'
     required_params = ["sim",
                        "archive",
                        "stages",
                        "md_engine",
                        "local_category",
                        "md_category",
-                       "postprocessing_wf",
+                       "postrun_wf",
+                       "post_wf",
                        "files"]
 
     def run_task(self, fw_spec):
@@ -94,7 +98,19 @@ class GromacsContinueTask(FireTaskBase):
                                   md_engine=self['md_engine'],
                                   md_category=self['md_category'],
                                   local_category=self['local_category'],
-                                  postprocessing_wf=self['postprocessing_wf'],
+                                  postrun_wf=self['postrun_wf'],
                                   files=self['files'])
 
             return FWAction(additions=[wf])
+
+        elif self.get('post_wf'):
+            # otherwise, we submit the post workflow
+            if isinstance(post_wf, dict):
+                post_wf = Workflow.from_dict(post_wf)
+
+            # this makes a fresh copy without already-used fw_ids
+            post_wf = Workflow.from_wflow(post_wf)
+
+            return FWAction(additions=[post_wf])
+
+

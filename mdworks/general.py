@@ -11,7 +11,7 @@ from .gromacs.firetasks import GromacsContinueTask
 
 def make_md_workflow(sim, archive, stages, md_engine='gromacs',
                      md_category='md', local_category='local',
-                     postprocessing_wf=None, files=None):
+                     postrun_wf=None, post_wf=None, files=None):
     """Construct a general, single MD simulation workflow.
 
     Assumptions
@@ -44,8 +44,11 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     local_category : str
         Category to use for non-MD Fireworks, which should be run by rockets
         where the ``archive`` directory is accessible.
-    postprocessing_wf : Workflow
-        Workflow to perform after copyback; performed in parallel to continuation run.
+    postrun_wf : Workflow
+        Workflow to perform after each copyback; performed in parallel to continuation run.
+    post_wf : Workflow
+        Workflow to perform after completed MD (no continuation); use for final
+        postprocessing. 
     files : list 
         Names of files (not paths) needed for each leg of the simulation. Need
         not exist, but if they do they will get staged before each run.
@@ -68,7 +71,7 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
                                           user=stage['user'],
                                           files=[os.path.join(archive, i) for i in f_exist],
                                           dest=os.path.join(stage['staging'], sim.uuid),
-                                          retry=True,
+                                          max_retry=100,
                                           shell_interpret=True))
 
     fw_stage = Firework(fts_stage,
@@ -109,10 +112,10 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     ## locally
 
     if md_engine == 'gromacs':
-        ft_continue = GromacsContinueTaskContinueTask(
+        ft_continue = GromacsContinueTask(
                 sim=sim, archive=archive, stages=stages, md_engine=md_engine,
                 md_category=md_category, local_category=local_category,
-                postprocessing_wf=postprocessing_wf, files=files)
+                postrun_wf=postrun_wf, post_wf=post_wf, files=files)
     else:
         raise ValueError("No known md engine `{}`.".format(md_engine))
 
@@ -126,11 +129,11 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
                   name='{} | md'.format(sim.name),
                   metadata=dict(sim.categories))
 
-    ## Mix in postprocessing workflow, if given
-    if postprocessing_wf:
-        if isinstance(postprocessing_wf, dict):
-            postprocessing_wf = Workflow.from_dict(postprocessing_wf)
+    ## Mix in postrun workflow, if given
+    if postrun_wf:
+        if isinstance(postrun_wf, dict):
+            postrun_wf = Workflow.from_dict(postrun_wf)
 
-        wf.append_wf(Workflow.from_Workflow(postprocessing_wf), [fw_copyback.fw_id])
+        wf.append_wf(Workflow.from_wflow(postrun_wf), [fw_copyback.fw_id])
         
     return wf
