@@ -11,11 +11,15 @@ class BeaconTask(FireTaskBase):
     A FireTask to tell the next Firework where the generated files are
     so they can be pulled back down.
 
+    Required params:
+        - uuid: (str) uuid of Sim to set beacon for
+
     """
     _fw_name = 'BeaconTask'
+    required_params = ["uuid"]
 
     def run_task(self, fw_spec):
-        return FWAction(update_spec={'files': [os.environ['SCRATCHDIR']],
+        return FWAction(update_spec={'files': [os.path.join(os.environ['SCRATCHDIR'], uuid)],
                                      'server': os.environ['HOST'],
                                      'user': os.environ['USER']})
 
