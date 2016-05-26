@@ -19,7 +19,7 @@ class MkRunDirTask(FireTaskBase):
     required_params = ["uuid"]
 
     def run_task(self, fw_spec):
-        rundir = os.path.join(os.environ['SCRATCHDIR'], uuid)
+        rundir = os.path.join(os.environ['SCRATCHDIR'], self['uuid'])
         try:
             os.makdirs(rundir)
         except OSError:
@@ -40,7 +40,7 @@ class BeaconTask(FireTaskBase):
     required_params = ["uuid"]
 
     def run_task(self, fw_spec):
-        return FWAction(update_spec={'files': [os.path.join(os.environ['SCRATCHDIR'], uuid)],
+        return FWAction(update_spec={'files': [os.path.join(os.environ['SCRATCHDIR'], self['uuid'])],
                                      'server': os.environ['HOST'],
                                      'user': os.environ['USER']})
 
