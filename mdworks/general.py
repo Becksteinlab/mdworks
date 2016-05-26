@@ -111,8 +111,8 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
                                shell_interpret=True)
 
     # next, run MD
-    ft_md = ScriptTask(script='run_md.sh',
-                       stdin_file=os.path.join('${SCRATCHDIR}/', sim.uuid),
+    ft_md = ScriptTask(script='run_md.sh {}'.format(
+                            os.path.join('${SCRATCHDIR}/', sim.uuid)),
                        use_shell=True,
                        fizzle_bad_rc=True)
 
