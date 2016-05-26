@@ -15,7 +15,7 @@ class MkRunDirTask(FireTaskBase):
         - uuid: (str) uuid of Sim to make rundir for
 
     """
-    _fw_name = 'BeaconTask'
+    _fw_name = 'MkRunDirTask'
     required_params = ["uuid"]
 
     def run_task(self, fw_spec):
