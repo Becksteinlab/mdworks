@@ -1,6 +1,8 @@
+from six import string_types
 import os
 
 import mdsynthesis as mds
+import yaml
 
 from fireworks import ScriptTask, PyTask, FileTransferTask
 from fireworks import Workflow, Firework
@@ -32,11 +34,13 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     archive : str
         Absolute path to directory to launch from, which holds all required
         files for running MD. 
-    stages : list
+    stages : list, str
         Dicts giving for each of the following keys:
             - 'server': server host to transfer to
             - 'user': username to authenticate with
             - 'staging': absolute path to staging area on remote resource
+        alternatively, a path to a yaml file giving a list of dictionaries
+        with the same information.
     md_engine : {'gromacs'}
         MD engine name; needed to determine continuation mechanism to use.
     md_category : str
@@ -68,6 +72,10 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     #      of being attached to another, these files may not exist at all yet
     f_exist = [f for f in files if os.path.exists(os.path.join(archive, f))]
 
+    if isinstance(stages, string_types):
+        with open(stages, 'r') as f:
+            stages = yaml.load(f)
+
     ## Stage files on all resources where MD may run; takes place locally
     fts_stage = list()
     for stage in stages:
@@ -76,7 +84,7 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
                                           user=stage['user'],
                                           files=[os.path.join(archive, i) for i in f_exist],
                                           dest=os.path.join(stage['staging'], sim.uuid),
-                                          max_retry=100,
+                                          max_retry=5,
                                           shell_interpret=True))
 
     fw_stage = Firework(fts_stage,
