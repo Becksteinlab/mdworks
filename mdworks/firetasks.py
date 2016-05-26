@@ -6,6 +6,27 @@ from os.path import expanduser
 from fireworks import FireTaskBase, FWAction
 
 
+class MkRunDirTask(FireTaskBase):
+    """
+    A FireTask to make the rundir for an MD run. Needed for clean copying of
+    launch files from staging.
+
+    Required params:
+        - uuid: (str) uuid of Sim to make rundir for
+
+    """
+    _fw_name = 'BeaconTask'
+    required_params = ["uuid"]
+
+    def run_task(self, fw_spec):
+        rundir = os.path.join(os.environ['SCRATCHDIR'], uuid)
+        try:
+            os.makdirs(rundir)
+        except OSError:
+            # we don't care if the directory already exists
+            pass
+
+
 class BeaconTask(FireTaskBase):
     """
     A FireTask to tell the next Firework where the generated files are

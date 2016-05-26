@@ -7,7 +7,7 @@ import yaml
 from fireworks import ScriptTask, PyTask, FileTransferTask
 from fireworks import Workflow, Firework
 
-from .firetasks import FilePullTask, BeaconTask
+from .firetasks import FilePullTask, BeaconTask, MkRunDirTask
 from .gromacs.firetasks import GromacsContinueTask
 
 
@@ -100,23 +100,26 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
 
     ## MD execution; takes place in queue context of compute resource
 
+    # make rundir
+    ft_mkdir = MkRunDirTask(uuid=sim.uuid)
+
     # copy input files to scratch space
     ft_copy = FileTransferTask(mode='copy',
                                files=[os.path.join('${STAGING}/', sim.uuid, i) for i in files],
-                               dest=os.path.join('${SCRATCHDIR}/' sim.uuid),
+                               dest=os.path.join('${SCRATCHDIR}/', sim.uuid),
                                ignore_missing=True,
                                shell_interpret=True)
 
     # next, run MD
     ft_md = ScriptTask(script='run_md.sh',
-                       stdin_key=os.path.join('${SCRATCHDIR}/' sim.uuid),
+                       stdin_key=os.path.join('${SCRATCHDIR}/', sim.uuid),
                        use_shell=True,
                        fizzle_bad_rc=True)
 
     # send info on where files live to pull firework
     ft_info = BeaconTask(uuid=sim.uuid)
 
-    fw_md = Firework([ft_copy, ft_md, ft_info],
+    fw_md = Firework([ft_mkdir, ft_copy, ft_md, ft_info],
                      spec={'_category': md_category},
                      name='md')
 
