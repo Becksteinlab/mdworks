@@ -21,7 +21,7 @@ class MkRunDirTask(FireTaskBase):
     def run_task(self, fw_spec):
         rundir = os.path.join(os.environ['SCRATCHDIR'], self['uuid'])
         try:
-            os.makdirs(rundir)
+            os.makedirs(rundir)
         except OSError:
             # we don't care if the directory already exists
             pass
