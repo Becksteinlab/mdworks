@@ -47,12 +47,12 @@ class GromacsContinueTask(FireTaskBase):
     required_params = ["sim",
                        "archive",
                        "stages",
+                       "files",
                        "md_engine",
                        "local_category",
                        "md_category",
                        "postrun_wf",
-                       "post_wf",
-                       "files"]
+                       "post_wf"]
 
     def run_task(self, fw_spec):
         import gromacs
@@ -96,11 +96,12 @@ class GromacsContinueTask(FireTaskBase):
             wf = make_md_workflow(sim=self['sim'],
                                   archive=self['archive'],
                                   stages=self['stages'],
+                                  files=self['files'],
                                   md_engine=self['md_engine'],
                                   md_category=self['md_category'],
                                   local_category=self['local_category'],
                                   postrun_wf=self['postrun_wf'],
-                                  files=self['files'])
+                                  post_wf=self['post_wf'])
 
             return FWAction(additions=[wf])
         else:

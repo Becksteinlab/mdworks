@@ -11,9 +11,9 @@ from .firetasks import FilePullTask, BeaconTask, MkRunDirTask
 from .gromacs.firetasks import GromacsContinueTask
 
 
-def make_md_workflow(sim, archive, stages, md_engine='gromacs',
+def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
                      md_category='md', local_category='local',
-                     postrun_wf=None, post_wf=None, files=None):
+                     postrun_wf=None, post_wf=None):
     """Construct a general, single MD simulation workflow.
 
     Assumptions
@@ -46,6 +46,9 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
             - 'staging': absolute path to staging area on remote resource
         alternatively, a path to a yaml file giving a list of dictionaries
         with the same information.
+    files : list 
+        Names of files (not paths) needed for each leg of the simulation. Need
+        not exist, but if they do they will get staged before each run.
     md_engine : {'gromacs'}
         MD engine name; needed to determine continuation mechanism to use.
     md_category : str
@@ -58,9 +61,6 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     post_wf : Workflow
         Workflow to perform after completed MD (no continuation); use for final
         postprocessing. 
-    files : list 
-        Names of files (not paths) needed for each leg of the simulation. Need
-        not exist, but if they do they will get staged before each run.
 
     Returns
     -------
@@ -125,10 +125,10 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     ## locally
 
     if md_engine == 'gromacs':
-        ft_continue = GromacsContinueTask(
-                sim=sim, archive=archive, stages=stages, md_engine=md_engine,
+        ft_continue = GromacsContinueTask(sim=sim, archive=archive,
+                stages=stages, files=files, md_engine=md_engine,
                 md_category=md_category, local_category=local_category,
-                postrun_wf=postrun_wf, post_wf=post_wf, files=files)
+                postrun_wf=postrun_wf, post_wf=post_wf)
     else:
         raise ValueError("No known md engine `{}`.".format(md_engine))
 
