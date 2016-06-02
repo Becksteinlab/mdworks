@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+from six import string_types
 import os
 
 import traceback
@@ -32,9 +33,12 @@ class StagingTask(FireTaskBase):
     required_params = ["stages", "files", "uuid"]
 
     def run_task(self, fw_spec):
+        import yaml
+        import time
         import paramiko
 
         files = self.get('files')
+        stages = self.get('stages')
 
         shell_interpret = self.get('shell_interpret', True)
         max_retry = self.get('max_retry', 0)
@@ -56,13 +60,20 @@ class StagingTask(FireTaskBase):
         for stage in stages:
             # we place files in a staging directory corresponding to its uuid
             # easy to find that way
-            dest = os.path.join(stage['staging'], sim.uuid),
+            dest = os.path.join(stage['staging'], self['uuid'])
             
             # create ssh connection
             ssh = paramiko.SSHClient()
             ssh.load_host_keys(expanduser(os.path.join("~", ".ssh", "known_hosts")))
             ssh.connect(stage['server'], username=stage['user'], key_filename=self.get('key_filename'))
             sftp = ssh.open_sftp()
+
+            # if destination exists, delete all files inside; don't want stale files
+            if self._rexists(sftp, dest):
+                for f in sftp.listdir(dest):
+                    sftp.remove(os.path.join(dest, f))
+            else:
+                sftp.mkdir(dest)
 
             for f in self["files"]:
                 try:
@@ -73,18 +84,7 @@ class StagingTask(FireTaskBase):
                     if allow_missing and not os.path.exists(src):
                         continue
 
-                    # make the destination if we haven't already
-                    if not self._rexists(sftp, dest):
-                        sftp.mkdir(dest)
-
-                    # allow for case in which source is a directory;
-                    # may remove later; not recursive
-                    if os.path.isdir(src):
-                        for f in os.listdir(src):
-                            if os.path.isfile(os.path.join(src,f)):
-                                sftp.put(os.path.join(src, f), os.path.join(dest, f))
-                    else:
-                        sftp.put(src, os.path.join(dest, os.path.basename(src)))
+                    sftp.put(src, os.path.join(dest, os.path.basename(src)))
                 except:
                     traceback.print_exc()
                     if max_retry:
@@ -93,13 +93,15 @@ class StagingTask(FireTaskBase):
                         self['max_retry'] -= 1
                         self.run_task(fw_spec)
                     else:
-                        raise ValueError(
-                            "There was an error performing operation "
-                            "staging of {} to {}".format(mode, src,
-                                                         staging['server']))
+                        raise
 
             sftp.close()
             ssh.close()
+
+            # give the ssh daemon some time to breathe between stagings;
+            # with many simulations may be staging many simulations at once
+            # from same server
+            time.sleep(5)
 
     def _rexists(self, sftp, path):
         """
@@ -115,25 +117,32 @@ class StagingTask(FireTaskBase):
             return True
 
 
-class MkRunDirTask(FireTaskBase):
+class Stage2RunDirTask(FireTaskBase):
     """
-    A FireTask to make the rundir for an MD run. Needed for clean copying of
-    launch files from staging.
+    A FireTask to make the rundir for an MD run, and copy files from staging.
 
     Required params:
         - uuid: (str) uuid of Sim to make rundir for
 
     """
-    _fw_name = 'MkRunDirTask'
+    _fw_name = 'Stage2RunDirTask'
     required_params = ["uuid"]
 
     def run_task(self, fw_spec):
+        import shutil
+
         rundir = os.path.join(os.environ['SCRATCHDIR'], self['uuid'])
+        staging = os.path.join(os.environ['STAGING'], self['uuid'])
+
         try:
             os.makedirs(rundir)
         except OSError:
             # we don't care if the directory already exists
             pass
+
+        # copy files from stage to rundir
+        for f in os.listdir(staging):
+            shutil.copy(os.path.join(staging, f), rundir)
 
 
 class BeaconTask(FireTaskBase):
