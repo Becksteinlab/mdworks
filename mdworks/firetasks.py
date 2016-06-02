@@ -216,7 +216,7 @@ class FilePullTask(FireTaskBase):
         ssh.close()
 
 
-class CleanupTask(FireTaskBase)
+class CleanupTask(FireTaskBase):
     """
     A FireTask for removing the directory and all files generated from an MD
     run.

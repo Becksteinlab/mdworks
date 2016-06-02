@@ -13,7 +13,7 @@ from .gromacs.firetasks import GromacsContinueTask
 
 
 def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
-                     cleanup=False, md_category='md', local_category='local',
+                     md_category='md', local_category='local',
                      postrun_wf=None, post_wf=None):
     """Construct a general, single MD simulation workflow.
 
@@ -52,9 +52,6 @@ def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
         not exist, but if they do they will get staged before each run.
     md_engine : {'gromacs'}
         MD engine name; needed to determine continuation mechanism to use.
-    cleanup : bool
-        If True, delete files generated from each run on the remote resource after
-        they have been successfully copied back to archive.
     md_category : str
         Category to use for the MD Firework. Used to target to correct rockets.
     local_category : str
@@ -106,7 +103,8 @@ def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
 
     fw_md = Firework([ft_copy, ft_info, ft_md],
                      spec={'_category': md_category},
-                     name='md')
+                     name='md',
+                     parents=fw_stage)
 
  
     ## Pull files back to archive; takes place locally
@@ -115,7 +113,8 @@ def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
     fw_copyback = Firework([ft_copyback],
                            spec={'_launch_dir': archive,
                                  '_category': local_category},
-                           name='pull')
+                           name='pull',
+                           parents=fw_md)
 
     ## Clean up files in rundir on remote resource
     ft_cleanup = CleanupTask(uuid=sim.uuid)
@@ -123,7 +122,8 @@ def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
     fw_cleanup = Firework([ft_cleanup],
                           spec={'_launch_dir': archive,
                                 '_category': local_category},
-                          name='cleanup')
+                          name='cleanup',
+                          parents=[fw_copyback, fw_md])
 
     ## Decide if we need to continue and submit new workflow if so; takes place
     ## locally
@@ -139,11 +139,10 @@ def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
     fw_continue = Firework([ft_continue],
                            spec={'_launch_dir': archive,
                                  '_category': local_category},
-                           name='continue')
+                           name='continue',
+                           parents=fw_cleanup)
 
-    wf = Workflow([fw_stage, fw_md, fw_copyback, fw_continue],
-                  links_dict={fw_stage: [fw_md], fw_md: [fw_copyback, fw_cleanup],
-                              fw_copyback: [fw_cleanup, fw_continue]},
+    wf = Workflow([fw_stage, fw_md, fw_copyback, fw_cleanup, fw_continue],
                   name='{} | md'.format(sim.name),
                   metadata=dict(sim.categories))
 
