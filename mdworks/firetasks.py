@@ -223,12 +223,12 @@ class CleanupTask(FireTaskBase)
 
     """
     _fw_name = 'CleanupTask'
+    required_params = ["uuid"]
 
     def run_task(self, fw_spec):
         shell_interpret = self.get('shell_interpret', True)
         ignore_errors = self.get('ignore_errors')
 
-        # remote transfers
         # Create SFTP connection
         import paramiko
         ssh = paramiko.SSHClient()
@@ -238,15 +238,11 @@ class CleanupTask(FireTaskBase)
 
         def delete_dir(sftp, directory):
             for g in sftp.listdir(directory):
-                # first try to remove as a file
-                try:
-                    sftp.remove(os.path.join(directory, g))
-                except OSError:
-                    # must be a directory; first go inside and delete all files
-                    delete_dir(os.path.join(directory, g))
+                # first remove files
+                sftp.remove(os.path.join(directory, g))
 
-                    # then delete the directory
-                    sftp.rmdir(directory)
+                # then delete the directory
+                sftp.rmdir(directory)
 
         for item in fw_spec["files"]:
             try:
