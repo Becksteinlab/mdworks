@@ -16,5 +16,5 @@ setup(name='mdworks',
       author_email='dotsdl@gmail.com',
       packages=['mdworks', 'mdworks.gromacs'],
       license='BSD',
-      install_requires=['fireworks', 'mdsynthesis', 'GromacsWrapper']
+      install_requires=['fireworks', 'mdsynthesis', 'GromacsWrapper', 'PyYAML']
       )

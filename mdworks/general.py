@@ -1,17 +1,19 @@
+from six import string_types
 import os
 
 import mdsynthesis as mds
+import yaml
 
 from fireworks import ScriptTask, PyTask, FileTransferTask
 from fireworks import Workflow, Firework
 
-from .firetasks import FilePullTask, BeaconTask
+from .firetasks import FilePullTask, BeaconTask, Stage2RunDirTask, StagingTask
 from .gromacs.firetasks import GromacsContinueTask
 
 
-def make_md_workflow(sim, archive, stages, md_engine='gromacs',
+def make_md_workflow(sim, archive, stages, files, md_engine='gromacs',
                      md_category='md', local_category='local',
-                     postrun_wf=None, post_wf=None, files=None):
+                     postrun_wf=None, post_wf=None):
     """Construct a general, single MD simulation workflow.
 
     Assumptions
@@ -25,6 +27,11 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     The staging directory must already exist on all resources specified in
     ``stages``.
 
+    The script ``run_md.sh`` must be somewhere on your path, and must take
+    a single argument giving the directory to execute MD out of. It should
+    create and change the working directory to that directory before anything
+    else.
+
     Parameters
     ----------
     sim : str
@@ -32,11 +39,16 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     archive : str
         Absolute path to directory to launch from, which holds all required
         files for running MD. 
-    stages : list
+    stages : list, str
         Dicts giving for each of the following keys:
             - 'server': server host to transfer to
             - 'user': username to authenticate with
             - 'staging': absolute path to staging area on remote resource
+        alternatively, a path to a yaml file giving a list of dictionaries
+        with the same information.
+    files : list 
+        Names of files (not paths) needed for each leg of the simulation. Need
+        not exist, but if they do they will get staged before each run.
     md_engine : {'gromacs'}
         MD engine name; needed to determine continuation mechanism to use.
     md_category : str
@@ -49,9 +61,6 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     post_wf : Workflow
         Workflow to perform after completed MD (no continuation); use for final
         postprocessing. 
-    files : list 
-        Names of files (not paths) needed for each leg of the simulation. Need
-        not exist, but if they do they will get staged before each run.
 
     Returns
     -------
@@ -64,40 +73,32 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     #TODO: perhaps move to its own FireTask?
     sim.categories['md_status'] = 'running'
 
-    #TODO: the trouble with this is that if this workflow is created with the intent
-    #      of being attached to another, these files may not exist at all yet
-    f_exist = [f for f in files if os.path.exists(os.path.join(archive, f))]
+    ft_stage = StagingTask(stages=stages,
+                           files=files,
+                           archive=archive,
+                           uuid=sim.uuid,
+                           shell_interpret=True,
+                           max_retry=5,
+                           allow_missing=True)
 
-    ## Stage files on all resources where MD may run; takes place locally
-    fts_stage = list()
-    for stage in stages:
-        fts_stage.append(FileTransferTask(mode='rtransfer',
-                                          server=stage['server'],
-                                          user=stage['user'],
-                                          files=[os.path.join(archive, i) for i in f_exist],
-                                          dest=os.path.join(stage['staging'], sim.uuid),
-                                          max_retry=100,
-                                          shell_interpret=True))
-
-    fw_stage = Firework(fts_stage,
+    fw_stage = Firework([ft_stage],
                         spec={'_launch_dir': archive,
                               '_category': local_category},
                         name='staging')
 
-
     ## MD execution; takes place in queue context of compute resource
 
     # copy input files to scratch space
-    ft_copy = FileTransferTask(mode='copy',
-                               files=[os.path.join('${STAGING}/', sim.uuid, i) for i in f_exist],
-                               dest='${SCRATCHDIR}/',
-                               shell_interpret=True)
+    ft_copy = Stage2RunDirTask(uuid=sim.uuid)
 
     # next, run MD
-    ft_md = ScriptTask(script='run_md.sh', fizzle_bad_rc=True)
+    ft_md = ScriptTask(script='run_md.sh {}'.format(
+                            os.path.join('${SCRATCHDIR}/', sim.uuid)),
+                       use_shell=True,
+                       fizzle_bad_rc=True)
 
     # send info on where files live to pull firework
-    ft_info = BeaconTask()
+    ft_info = BeaconTask(uuid=sim.uuid)
 
     fw_md = Firework([ft_copy, ft_md, ft_info],
                      spec={'_category': md_category},
@@ -117,10 +118,10 @@ def make_md_workflow(sim, archive, stages, md_engine='gromacs',
     ## locally
 
     if md_engine == 'gromacs':
-        ft_continue = GromacsContinueTask(
-                sim=sim, archive=archive, stages=stages, md_engine=md_engine,
+        ft_continue = GromacsContinueTask(sim=sim, archive=archive,
+                stages=stages, files=files, md_engine=md_engine,
                 md_category=md_category, local_category=local_category,
-                postrun_wf=postrun_wf, post_wf=post_wf, files=files)
+                postrun_wf=postrun_wf, post_wf=post_wf)
     else:
         raise ValueError("No known md engine `{}`.".format(md_engine))
 
