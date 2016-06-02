@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import os
 
 import mdsynthesis as mds
-from fireworks import FireTaskBase, FWAction
+from fireworks import FireTaskBase, FWAction, Workflow
 
 
 class GromacsContinueTask(FireTaskBase):
@@ -83,6 +83,13 @@ class GromacsContinueTask(FireTaskBase):
         else:
             tpr = os.path.join(self['archive'], tpr[0])
 
+        # let's extract the current frame and place it in the archive, since
+        # this is useful for starting runs up at any point from the current end
+        gromacs.trjconv(f=cpt, s=tpr,
+                        o=os.path.join(self['archive'], '{}.gro'.format(
+                            os.path.splitext(os.path.basename(tpr))[0])),
+                        input=('0',))
+
         # extract step number from CPT file
         out = gromacs.dump(cp=cpt, stdout=False)
         step = int([line.split(' ')[-1] for line in out[1].split('\n') if 'step = ' in line][0])
@@ -105,11 +112,12 @@ class GromacsContinueTask(FireTaskBase):
 
             return FWAction(additions=[wf])
         else:
-            sim = mds.Sim(fw_spec['sim'])
+            sim = mds.Sim(self['sim'])
             sim.categories['md_status'] = 'finished'
 
             # if given, we submit the post workflow
-            if self.get('post_wf'):
+            post_wf = self.get('post_wf')
+            if post_wf:
                 if isinstance(post_wf, dict):
                     post_wf = Workflow.from_dict(post_wf)
 
