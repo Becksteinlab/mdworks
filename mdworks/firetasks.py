@@ -241,8 +241,8 @@ class CleanupTask(FireTaskBase):
                 # first remove files
                 sftp.remove(os.path.join(directory, g))
 
-                # then delete the directory
-                sftp.rmdir(directory)
+            # then delete the directory
+            sftp.rmdir(directory)
 
         for item in fw_spec["files"]:
             try:
@@ -254,10 +254,7 @@ class CleanupTask(FireTaskBase):
                     sftp.remove(item)
             except:
                 traceback.print_exc()
-                if not ignore_errors:
-                    raise ValueError(
-                        "There was an error deleting {} from {}".format(
-                            item,fw_spec['server']))
+                raise
 
         sftp.close()
         ssh.close()
