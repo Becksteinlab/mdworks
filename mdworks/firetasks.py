@@ -147,8 +147,8 @@ class Stage2RunDirTask(FireTaskBase):
 
 class BeaconTask(FireTaskBase):
     """
-    A FireTask to tell the next Firework where the generated files are
-    so they can be pulled back down.
+    A FireTask to tell the child Firework(s) where the generated files are so
+    they can be pulled back down.
 
     Required params:
         - uuid: (str) uuid of Sim to set beacon for
@@ -211,6 +211,50 @@ class FilePullTask(FireTaskBase):
                     raise ValueError(
                         "There was an error performing operation {} from {} "
                         "to {}".format(mode, self["files"], self["dest"]))
+
+        sftp.close()
+        ssh.close()
+
+
+class CleanupTask(FireTaskBase):
+    """
+    A FireTask for removing the directory and all files generated from an MD
+    run.
+
+    """
+    _fw_name = 'CleanupTask'
+    required_params = ["uuid"]
+
+    def run_task(self, fw_spec):
+        shell_interpret = self.get('shell_interpret', True)
+        ignore_errors = self.get('ignore_errors')
+
+        # Create SFTP connection
+        import paramiko
+        ssh = paramiko.SSHClient()
+        ssh.load_host_keys(expanduser(os.path.join("~", ".ssh", "known_hosts")))
+        ssh.connect(fw_spec['server'], username=fw_spec['user'], key_filename=self.get('key_filename'))
+        sftp = ssh.open_sftp()
+
+        def delete_dir(sftp, directory):
+            for g in sftp.listdir(directory):
+                # first remove files
+                sftp.remove(os.path.join(directory, g))
+
+            # then delete the directory
+            sftp.rmdir(directory)
+
+        for item in fw_spec["files"]:
+            try:
+                # try case where item is a directory
+                try:
+                    delete_dir(sftp, item)
+                except IOError:
+                    # if src isn't a directory, it should be a file
+                    sftp.remove(item)
+            except:
+                traceback.print_exc()
+                raise
 
         sftp.close()
         ssh.close()
