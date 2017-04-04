@@ -209,8 +209,8 @@ class FilePullTask(FireTaskBase):
                 traceback.print_exc()
                 if not ignore_errors:
                     raise ValueError(
-                        "There was an error performing operation {} from {} "
-                        "to {}".format(mode, self["files"], self["dest"]))
+                        "There was an error performing pull from {} "
+                        "to {}".format(self["files"], self["dest"]))
 
         sftp.close()
         ssh.close()
