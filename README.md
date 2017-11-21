@@ -2,7 +2,7 @@
 
 ``mdworks`` is a package for building fire-and-forget automated workflows for
 performing molecular dynamics simulation using
-[Fireworks](http://pythonhosted.org/FireWorks/). It implements both
+[Fireworks](https://materialsproject.github.io/fireworks/). It implements both
 general-purpose and engine-specific building blocks, making it easy to build
 common workflows and simple enough to construct more complex ones.
 
